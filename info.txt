@@ -1,0 +1,5 @@
+1. apt install awscli 
+2. aws configure 
+enter login and password of AWS account 
+2. apt install python3 git ansible python3-pip 
+3. pip install boto
