@@ -1,59 +1,53 @@
-
 - name: Ansible test
   hosts: localhost
   tasks:
 
-
-  - name: make-amazone-group
-    ec2_group:
-      name: group-web
-      description: group-web
-      vpc_id: vpc-group-web01
-      region: us-east-2
-      rules:
-        - proto: tcp
-          ports: 22
-          cidr_ip: 46.8.73.34/32
-          rule_desc: access-ssh
-
-
+  - name: inclide vars
+    include_vars:
+      dir: vars
 
 
   - name: launching AWS instance using Ansible
     ec2:
-      key_name: edik
+      key_name: edik2-key1
       instance_type: t2.micro
       image: ami-00399ec92321828f5
       region: us-east-2
       wait: yes
-      #  group: Ansible
+      group: edik2
       count: 1
       vpc_subnet_id: subnet-7f22a014
       assign_public_ip: yes
-      aws_access_key: 333
-      aws_secret_key: 444
-
+      aws_access_key: "{{ awsuser }}"
+      aws_secret_key: "{{ awspass }}"
+      assign_public_ip: yes
     register: output
 
   - name: get ip
     debug:
       var: output.instances[0].public_ip
-
-  - name: update inventory
+  - name: add-info-to-hosts-ansible
     add_host:
       name: "{{ output.instances[0].public_ip }} "
-      groups: amazon-servers
+      groups: amazon-servers-builder
 
-
-
-- name: install nginx
-  hosts: amazon-servers
+- name: install default-jdk, maven, git
+  hosts: amazon-servers-builder
   remote_user: ubuntu
   become: yes
-  become_user: root
   tasks:
-    - name: install nginx
+    - name: make builder
       apt:
-        name: nginx
+        name: install soft
+          - default-jdk
+          - maven
+          - git
         state: present
         update_cache: yes
+
+    - name: get git project
+      git: repo='https://github.com/boxfuse/boxfuse-sample-java-war-hello.git' dest=/home/boxfuse-sample-java-war-hello
+
+    - name: makewar
+      shell:
+        cmd: mvn -f /home/boxfuse-sample-java-war-hello/pom.xml clean package
