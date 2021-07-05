@@ -1,7 +1,24 @@
-# Basic provisioning example
+
 - name: Ansible test
   hosts: localhost
   tasks:
+
+
+  - name: make-amazone-group
+    ec2_group:
+      name: group-web
+      description: group-web
+      vpc_id: vpc-group-web01
+      region: us-east-2
+      rules:
+        - proto: tcp
+          ports: 22
+          cidr_ip: 46.8.73.34/32
+          rule_desc: access-ssh
+
+
+
+
   - name: launching AWS instance using Ansible
     ec2:
       key_name: edik
@@ -13,5 +30,30 @@
       count: 1
       vpc_subnet_id: subnet-7f22a014
       assign_public_ip: yes
-      aws_access_key: tamtamamtamtamtsm
-      aws_secret_key: abcdefgefgefg
+      aws_access_key: 333
+      aws_secret_key: 444
+
+    register: output
+
+  - name: get ip
+    debug:
+      var: output.instances[0].public_ip
+
+  - name: update inventory
+    add_host:
+      name: "{{ output.instances[0].public_ip }} "
+      groups: amazon-servers
+
+
+
+- name: install nginx
+  hosts: amazon-servers
+  remote_user: ubuntu
+  become: yes
+  become_user: root
+  tasks:
+    - name: install nginx
+      apt:
+        name: nginx
+        state: present
+        update_cache: yes
