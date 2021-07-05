@@ -1,20 +1,9 @@
-- name: Ansible test
-  hosts: localhost
-  tasks:
-
-  - name: inclide vars
-    include_vars:
-      dir: vars
-
-
-  - name: launching AWS instance using Ansible
-    ec2:
-      key_name: edik2-key1
+      key_name: edik3-key1
       instance_type: t2.micro
       image: ami-00399ec92321828f5
       region: us-east-2
       wait: yes
-      group: edik2
+      group: edik3
       count: 1
       vpc_subnet_id: subnet-7f22a014
       assign_public_ip: yes
@@ -26,28 +15,44 @@
   - name: get ip
     debug:
       var: output.instances[0].public_ip
+
+#  - name: put-info-about-host-to ansible hosts
+#    shell:
+#      cmd: echo "{{ output.instances[0].public_ip }}" >> /etc/ansible/hosts & echo "[awsbuilder]" >> /etc/ansible/hosts
+
+  - name: Pause for 5 minutes to build app cache
+    pause:
+      minutes: 1
+
+
+
   - name: add-info-to-hosts-ansible
     add_host:
-      name: "{{ output.instances[0].public_ip }} "
-      groups: amazon-servers-builder
+      name: "{{ output.instances[0].public_ip }}"
+      groups: awsbuilder
 
 - name: install default-jdk, maven, git
-  hosts: amazon-servers-builder
+  hosts: awsbuilder
   remote_user: ubuntu
   become: yes
+  become_user: root
   tasks:
-    - name: make builder
-      apt:
-        name: install soft
-          - default-jdk
-          - maven
-          - git
-        state: present
-        update_cache: yes
 
-    - name: get git project
-      git: repo='https://github.com/boxfuse/boxfuse-sample-java-war-hello.git' dest=/home/boxfuse-sample-java-war-hello
+  - name: Update apt-get repo and cache
+    apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
 
-    - name: makewar
-      shell:
-        cmd: mvn -f /home/boxfuse-sample-java-war-hello/pom.xml clean package
+  - name: Ensure package
+    apt:
+      pkg:
+      - default-jdk
+      - maven
+      - git
+
+  - name: get git project
+    git: repo='https://github.com/tarekkhoury/mywebapplication.git' dest=/home/mywebapplication
+
+
+  - name: make war
+    shell:
+      cmd:  mvn -f /home/mywebapplication/pom.xml clean package
+# ansible-playbook ap.yml  --ask-vault-pass
