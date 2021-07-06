@@ -1,13 +1,53 @@
-1. apt install awscli 
-2. aws configure 
-enter login and password of AWS account 
-2. apt install python3 git ansible python3-pip 
-3. pip install boto boto3
-4. ansible-galaxy collection install amazon.aws
+на рабочей машине команды
 
-root@test1:~/hm13# ansible-galaxy collection install amazon.aws
-Process install dependency map
-ansible-galaxy collection install amazon.awsansible-galaxy collection install amazon.awsStarting collection install process
-Installing 'amazon.aws:1.5.0' to '/root/.ansible/collections/ansible_collections/amazon/aws'
-root@test1:~/hm13#
+apt update
+apt install awscli
+apt install ansible
+apt install python3-pip
+pip install boto boto3 botocore
+ansible-galaxy collection install amazon.aws
+aws configure
+При конфигурации AWS указываем 
+awsuserkey и  awsuserpasswd, созданные при регистрации в Aws
+регион берем из адресной строки веб ссылки aws из личного кабинета 
+В нашем примере это 
+https://us-east-2.console.aws.amazon.com/console/home?region=us-east-2#
+default format json
 
+далее 
+1. создаем security group
+aws ec2 create-security-group  --group-name edik3 --description "allwo port 22"
+2. Делаем правило для группы, открываем 22 порт для публичного ip рабочей машины. 
+aws ec2 authorize-security-group-ingress --group-name edik3 --protocol tcp --port 22 --cidr 34.72.140.97/32
+3. Создаем ключевую пару, которую далее будем использовать в плейбуке 
+aws ec2 create-key-pair --key-name my-key36  --query 'KeyMaterial' --output text > ~/.ssh/my-key.pem
+Даем права на файл сhmod 400 ~/.ssh/my-key.pem
+Иначе при выполнении плейбука откажется его использовать
+4. создаем папку для работы 
+mkdir /root/hm
+5 создаем папку для ключей 
+mkdir /root/hm/vars
+6 создаем в папке два файла 
+awspass.yml 
+содержимое файла
+awspass: 1234234234234
+где 1234234234234 - пароль от aws
+
+awsuser.yml
+содержимое файла
+awsuser: tretret333
+где tretret333 - логин от aws
+
+далее шифруем 
+
+ansible-vault encrypt /root/hm/vars/awsuser.yml
+ansible-vault encrypt /root/hm/vars/awspass.yml
+
+Далее пишем плейбук 
+и запускаем его через команду 
+ ansible-playbook -vv ap-2.yml --ask-vault-pass
+где имя ap-2.yml -плейбук
+при запуске попросят ввести пароль, который указывали при шифровании файлов.
+
+для доступа к машине используем команду 
+sh -i ~/.ssh/my-key.pem ubuntu@18.117.7.137

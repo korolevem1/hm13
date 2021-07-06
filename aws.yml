@@ -1,4 +1,3 @@
-root@hm3:~/hm# cat ap.yml
 - name: Ansible test
   hosts: localhost
   tasks:
@@ -16,7 +15,7 @@ root@hm3:~/hm# cat ap.yml
       region: us-east-2
       wait: yes
       group: edik3
-      count: 1
+      count: 2
       vpc_subnet_id: subnet-7f22a014
       assign_public_ip: yes
       aws_access_key: "{{ awsuser }}"
@@ -24,24 +23,60 @@ root@hm3:~/hm# cat ap.yml
       assign_public_ip: yes
     register: output
 
-  - name: get ip
+#################
+
+  - name: get ip1
     debug:
       var: output.instances[0].public_ip
+    
+  - name: add-host to awsbuilder
+    add_host:
+      name: "{{ output.instances[0].public_ip }}"
+      groups: awsbuilder
+
+###########################
+
+  - name: get ip2
+    debug:
+      var: output.instances[1].public_ip
+
+
+  - name: add-host to prod
+    add_host:
+      name: "{{ output.instances[1].public_ip }}"
+      groups: awsprod
+
+#############
+
 
 #  - name: put-info-about-host-to ansible hosts
 #    shell:
 #      cmd: echo "{{ output.instances[0].public_ip }}" >> /etc/ansible/hosts & echo "[awsbuilder]" >> /etc/ansible/hosts
 
-  - name: Pause for 5 minutes to build app cache
+  - name: Pause for 1 minutes to build app cache
     pause:
       minutes: 1
 
 
+  - name: Wait for SSH started1
+    wait_for: 
+      host: "{{ output.instances[0].public_ip }}" 
+      port: 22 
+      state: started
+    with_items: ec2.instances
 
-  - name: add-info-to-hosts-ansible
-    add_host:
-      name: "{{ output.instances[0].public_ip }}"
-      groups: awsbuilder
+  - name: Wait for SSH started2
+    wait_for:
+      host: "{{ output.instances[1].public_ip }}"
+      port: 22
+      state: started
+    with_items: ec2.instances
+
+
+  - name: Write the new ec2 instance host key to known hosts
+    connection: local
+    shell: "ssh-keyscan -H {{ inventory_hostname }} >> ~/.ssh/known_hosts"
+
 
 - name: install default-jdk, maven, git
   hosts: awsbuilder
@@ -55,16 +90,14 @@ root@hm3:~/hm# cat ap.yml
 
   - name: Ensure package
     apt:
-      pkg:
-      - default-jdk
+      pkg:      
       - maven
-      - git
       - awscli
       - python3-pip
 
   - name: install boto
     shell:
-      cmd: pip3 install boto
+      cmd: pip3 install boto & pip3 install boto3 & pip3 install botocore
 
   - name: get git project
     git: repo='https://github.com/tarekkhoury/mywebapplication.git' dest=/home/mywebapplication
@@ -77,24 +110,120 @@ root@hm3:~/hm# cat ap.yml
     include_vars:
       dir: vars
 
-- name: put data to s3
-  hosts: testservers
+
+- name: cp remote to local
+  hosts: awsbuilder
   remote_user: ubuntu
   become: yes
   become_user: root
   tasks:
 
-  - name: basic upload
-    aws_s3:
+  - name: copy from remote to local
+    fetch:
+      src: /home/mywebapplication/target/mywebapplication.war
+      dest: /root/hm/
+      flat: yes
 
+
+- name: put data to s3
+  hosts: localhost
+  #hosts: awsprod
+  #remote_user: ubuntu
+  #become: yes
+  #become_user: root
+  tasks:
+
+  - name: include vars
+    include_vars:
+      dir: vars
+
+  - name: basic upload to s3
+    aws_s3:
+    #s3_sync:
       region: us-east-2
-      aws_access_key: A3333
-      aws_secret_key: w333333
+
+      aws_access_key: "{{ awsuser }}"
+      aws_secret_key: "{{ awspass }}"
 
 
       bucket: web3.korolev.ru
+      #  file_root: /home/mywebapplication/target/mywebapplication.war
       object: mywebapplication.war
-      src: /home/mywebapplication/target/mywebapplication.war
+      src: /root/hm/mywebapplication.war
       mode: put
+######################################
+################ install tomcat
+###########################
 
-      # ansible-playbook ap.yml  --ask-vault-pass
+- name: install tomcat
+  hosts: awsprod
+  remote_user: ubuntu
+  become: yes
+  become_user: root
+  tasks:
+
+  - name: Update apt-get repo and cache
+    apt: update_cache=yes force_apt_get=yes cache_valid_time=3600
+
+  - name: Ensure package tomcat9
+    apt:
+      pkg:
+      - tomcat9
+
+  - name: Ensure tomcat9  service is started
+    service:
+      name: tomcat9  
+      state: started
+
+
+
+##################################
+##### get  data from s3 to localhost
+######################
+
+- name: put data to s3
+  hosts: localhost
+  #hosts: awsprod
+  #remote_user: ubuntu
+  #become: yes
+  #become_user: root
+  tasks:
+
+  - name: include vars
+    include_vars:
+      dir: vars
+
+  - name: basic download to local
+    aws_s3:
+    #s3_sync:
+      region: us-east-2
+
+      aws_access_key: "{{ awsuser }}"
+      aws_secret_key: "{{ awspass }}"
+
+
+      bucket: web3.korolev.ru
+      #  file_root: /home/mywebapplication/target/mywebapplication.war
+      object: mywebapplication.war
+      dest: /root/hm/mywebapplication.war
+      mode: get
+
+###############################
+#### put war  to awsprod
+##########################
+
+
+
+- name: cp remote to local
+  hosts: awsprod
+  remote_user: ubuntu
+  become: yes
+  become_user: root
+  tasks:
+
+  - name: copy from local to awsprod
+    copy:
+      src: /root/hm/mywebapplication.war
+      dest: /var/lib/tomcat9/webapps/mywebapplication.war
+     
+
