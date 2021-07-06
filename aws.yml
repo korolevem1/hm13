@@ -1,3 +1,15 @@
+root@hm3:~/hm# cat ap.yml
+- name: Ansible test
+  hosts: localhost
+  tasks:
+
+  - name: inclide vars
+    include_vars:
+      dir: vars
+
+
+  - name: launching AWS instance using Ansible
+    ec2:
       key_name: edik3-key1
       instance_type: t2.micro
       image: ami-00399ec92321828f5
@@ -47,12 +59,42 @@
       - default-jdk
       - maven
       - git
+      - awscli
+      - python3-pip
+
+  - name: install boto
+    shell:
+      cmd: pip3 install boto
 
   - name: get git project
     git: repo='https://github.com/tarekkhoury/mywebapplication.git' dest=/home/mywebapplication
 
-
   - name: make war
     shell:
       cmd:  mvn -f /home/mywebapplication/pom.xml clean package
-# ansible-playbook ap.yml  --ask-vault-pass
+
+  - name: inclide vars
+    include_vars:
+      dir: vars
+
+- name: put data to s3
+  hosts: testservers
+  remote_user: ubuntu
+  become: yes
+  become_user: root
+  tasks:
+
+  - name: basic upload
+    aws_s3:
+
+      region: us-east-2
+      aws_access_key: A3333
+      aws_secret_key: w333333
+
+
+      bucket: web3.korolev.ru
+      object: mywebapplication.war
+      src: /home/mywebapplication/target/mywebapplication.war
+      mode: put
+
+      # ansible-playbook ap.yml  --ask-vault-pass
