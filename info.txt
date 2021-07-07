@@ -51,3 +51,16 @@ ansible-vault encrypt /root/hm/vars/awspass.yml
 
 для доступа к машине используем команду 
 sh -i ~/.ssh/my-key.pem ubuntu@18.117.7.137
+
+для работы с aws на удаленных серверах передаем файл awsconfigure.sh
+И выполняем его.
+Внтури содержимого файла 
+строки
+
+
+aws configure set aws_access_key_id sdfdsfjkj2332***
+aws configure set aws_secret_access_key jkjkdsalflk;12k***
+aws configure set region us-west-2 
+aws configure set output json 
+
+Можно зашифровать файл с помощью absible-valt. То есть на рабочем месте будет шифрованный вариант, а на удаленной машине после работы ansible-playbook нешифрованный вариант. так как отработает ключ --ask-valt-pass

@@ -2,7 +2,7 @@
   hosts: localhost
   tasks:
 
-  - name: inclide vars
+  - name: include vars
     include_vars:
       dir: vars
 
@@ -111,18 +111,23 @@
       dir: vars
 
 
-- name: cp remote to local
-  hosts: awsbuilder
-  remote_user: ubuntu
-  become: yes
-  become_user: root
-  tasks:
+  - name: copy file
+    copy:
+      src: ./awsconfigure.sh
+      dest: /home/ubuntu/
+      mode: '0777'
 
-  - name: copy from remote to local
-    fetch:
-      src: /home/mywebapplication/target/mywebapplication.war
-      dest: /root/hm/
-      flat: yes
+  - name: start sh
+    shell:
+      cmd: /home/ubuntu/awsconfigure.sh
+
+  - name: put data s3
+    shell:
+      cmd :  aws s3 cp /home/mywebapplication/target/mywebapplication.war s3://web3.korolev.ru
+#    delegate_to: 127.0.0.1
+
+
+
 
 
 - name: put data to s3
@@ -137,22 +142,8 @@
     include_vars:
       dir: vars
 
-  - name: basic upload to s3
-    aws_s3:
-    #s3_sync:
-      region: us-east-2
-
-      aws_access_key: "{{ awsuser }}"
-      aws_secret_key: "{{ awspass }}"
-
-
-      bucket: web3.korolev.ru
-      #  file_root: /home/mywebapplication/target/mywebapplication.war
-      object: mywebapplication.war
-      src: /root/hm/mywebapplication.war
-      mode: put
 ######################################
-################ install tomcat
+################ install tomcat, pip3, awscli, boto. put sh scripts for aws configure and get data from s3
 ###########################
 
 - name: install tomcat
@@ -169,61 +160,29 @@
     apt:
       pkg:
       - tomcat9
+      - awscli
+      - python3-pip
 
   - name: Ensure tomcat9  service is started
     service:
       name: tomcat9  
       state: started
 
+  - name: install boto
+    shell:
+      cmd: pip3 install boto 
 
 
-##################################
-##### get  data from s3 to localhost
-######################
-
-- name: put data to s3
-  hosts: localhost
-  #hosts: awsprod
-  #remote_user: ubuntu
-  #become: yes
-  #become_user: root
-  tasks:
-
-  - name: include vars
-    include_vars:
-      dir: vars
-
-  - name: basic download to local
-    aws_s3:
-    #s3_sync:
-      region: us-east-2
-
-      aws_access_key: "{{ awsuser }}"
-      aws_secret_key: "{{ awspass }}"
-
-
-      bucket: web3.korolev.ru
-      #  file_root: /home/mywebapplication/target/mywebapplication.war
-      object: mywebapplication.war
-      dest: /root/hm/mywebapplication.war
-      mode: get
-
-###############################
-#### put war  to awsprod
-##########################
-
-
-
-- name: cp remote to local
-  hosts: awsprod
-  remote_user: ubuntu
-  become: yes
-  become_user: root
-  tasks:
-
-  - name: copy from local to awsprod
+  - name: copy file
     copy:
-      src: /root/hm/mywebapplication.war
-      dest: /var/lib/tomcat9/webapps/mywebapplication.war
-     
+      src: ./awsconfigure.sh
+      dest: /home/ubuntu/
+      mode: '0777'
 
+  - name: start sh
+    shell:
+      cmd: /home/ubuntu/awsconfigure.sh
+
+  - name: get data s3
+    shell:
+      cmd :  aws s3 cp s3://web3.korolev.ru/mywebapplication.war /var/lib/tomcat9/webapps/mywebapplication.war
